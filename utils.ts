@@ -29,7 +29,7 @@ export function isEven(n: number): boolean {
   }
   return true;
 }
-export type Format = { format: "png" | "jpeg" | "webp" | "svg", width?: number, height?: number, display?: "binary"|"dataUrl", filename?:string}
+export type Format = { format: "png" | "jpeg" | "webp" | "svg", width?: number, height?: number, filename?:string}
 
 export async function displayVega(plot: any, option: Format) {
   const baseSpec/*:TopLevelSpec*/ = plot.toSpec();
@@ -44,7 +44,6 @@ export async function displayVega(plot: any, option: Format) {
   const vlSpec = { ...baseSpec, width: finalWidth, height: finalHeight };
   const compiled = vegalite.compile(vlSpec).spec;
   const outFilename = option.filename==null? null: option.filename.endsWith("." + option.format)? option.filename : option.filename + "." + option.format
-// console.log(baseSpec)
   if (option.format==null || option.format === "svg") {
     //const view = await new vega.View(vega.parse(compiled), { renderer: "svg" }).runAsync();
     const view = await new vega.View(vega.parse(compiled)).runAsync();
@@ -66,36 +65,27 @@ export async function displayVega(plot: any, option: Format) {
     if(outFilename){
       Deno.writeFile(outFilename, content)
     }
-    //const format: skia.ImageFormat = "png"
-    //canvas.save("image2.png", format, quality);
-    //await Deno.jupyter.image("image2.png")
-
-    //works for png and jpg
-    //return await Deno.jupyter.image(canvas.encode(format, quality))
-
-    //lower level works also for webp
-    if(option.display==="dataUrl"){
-      const content2 = canvas.toDataURL(option.format,quality)
-      // console.log("content",content2);
-      // data:image/png;base64
-      return Deno.jupyter.display({ ["data:image/"+option.format+";base64"]: encodeBase64(content) }, { raw: true })
-    }
     return Deno.jupyter.display({ ["image/"+option.format]: encodeBase64(content) }, { raw: true });
-
-    //also via npm sharp package might work
-    //import sharp from "npm:sharp";
-    //const data = canvas.encode(format, quality);
-    //const buffer = await sharp(data).webp().toBuffer();
-    //await Deno.jupyter.display({ "image/webp": buffer }, { raw: true });
-    //or as in https://stackoverflow.com/questions/61329237/problem-with-canvas-using-vega-with-nodejs-server-side-only
-    //const view = await new vega.View(vega.parse(templateObject), {renderer: 'none'});
-    // view.toSVG().then(async function (svg) {
-    //await sharp(Buffer.from(svg)).toFormat('png').toFile('fileName.png')
-
-    // const data = Deno.readFileSync("./cat.jpg");
-    // await Deno.jupyter.image(data);
-    // return await Deno.jupyter.image("image2.png");
-    // const webpOutput = canvas.toDataURL(format, quality);
-    //await Deno.jupyter.display({ "image/webp": webpOutput }, { raw: true });
   }
+}
+
+
+export async function cachedFetch(filePath: string, url: string): Promise<string> {
+  try {
+    // Check if the file exists locally
+    await Deno.stat(filePath);
+    console.log("Reading from local cache:", filePath);
+  } catch {
+    // File does not exist, fetch and stream it to disk
+    console.log("Fetching from:", url);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
+    // Open file for writing
+    const file = await Deno.open(filePath, { write: true, create: true });
+    // Stream response body to the file
+    await response.body?.pipeTo(file.writable);
+    console.log("Cached locally:", filePath);
+  }
+  // Read and return the content
+  return await Deno.readTextFile(filePath);
 }
