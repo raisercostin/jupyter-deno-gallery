@@ -1,6 +1,8 @@
 //import pl from "npm:nodejs-polars";
 //import { document } from "jsr:@ry/jupyter-helper";
 import * as csv from "jsr:@std/csv";
+import * as vega from "npm:vega";
+import * as vegalite from "npm:vega-lite";
 
 export async function readAllCells2(filePath: string) {
   const file = await Deno.readTextFile(filePath);
@@ -24,4 +26,13 @@ export function isEven(n: number): boolean {
     return false
   }
   return true;
+}
+
+export async function displayVegaAsSvg(plot: any) {
+  const vlSpec = plot.toSpec();
+  const compiled = vegalite.compile(vlSpec).spec;
+  const view = new vega.View(vega.parse(compiled), { renderer: "svg" });
+  await view.runAsync();
+  const svgOutput = await view.toSVG();
+  return await Deno.jupyter.display({ "image/svg+xml": svgOutput }, { raw: true });
 }
